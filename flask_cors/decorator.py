@@ -101,7 +101,7 @@ def cross_origin(*args, **kwargs):
     :type automatic_options: bool
 
     """
-    _options = kwargs
+    _options = kwargs # 使用装饰器时带入的额外参数(@cross_origin(xxx=yyy, aaa=bbb...))
 
     def decorator(f):
         LOG.debug("Enabling %s for cross_origin using options:%s", f, _options)
@@ -113,6 +113,8 @@ def cross_origin(*args, **kwargs):
         # If f.provide_automatic_options is unset or True, Flask's route
         # decorator (which is actually wraps the function object we return)
         # intercepts OPTIONS handling, and requests will not have CORS headers
+        # 如果传入装饰器的参数中有automatic_options且值为True, 或没有传入automatic_options参数
+        # required_methods和provide_automatic_options详见https://flask.palletsprojects.com/en/1.1.x/api/#view-function-options
         if _options.get('automatic_options', True):
             f.required_methods = getattr(f, 'required_methods', set())
             f.required_methods.add('OPTIONS')
@@ -120,14 +122,14 @@ def cross_origin(*args, **kwargs):
 
         def wrapped_function(*args, **kwargs):
             # Handle setting of Flask-Cors parameters
-            options = get_cors_options(current_app, _options)
+            options = get_cors_options(current_app, _options) # parse并获得最终形式的options
 
             if options.get('automatic_options') and request.method == 'OPTIONS':
-                resp = current_app.make_default_options_response()
+                resp = current_app.make_default_options_response() # 如果允许automatic_options且请求方法是'OPTIONS', flask专门有一种为OPTIONS预检请求准备的响应
             else:
-                resp = make_response(f(*args, **kwargs))
+                resp = make_response(f(*args, **kwargs)) # 否则把被装饰函数的返回值做成响应
 
-            set_cors_headers(resp, options)
+            set_cors_headers(resp, options) # 用options设置响应头部
             setattr(resp, FLASK_CORS_EVALUATED, True)
             return resp
 

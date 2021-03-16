@@ -242,7 +242,7 @@ def set_cors_headers(resp, options):
            and not isinstance(resp.headers, MultiDict)):
         resp.headers = MultiDict(resp.headers)
 
-    headers_to_set = get_cors_headers(options, request.headers, request.method)
+    headers_to_set = get_cors_headers(options, request.headers, request.method) # 用请求头部、请求方法和传入的选项做一个响应头
 
     LOG.debug('Settings CORS headers: %s', str(headers_to_set))
 
@@ -291,13 +291,14 @@ def get_cors_options(appInstance, *dicts):
     the app's configuration-specified options and any dictionaries passed. The
     last specified option wins.
     """
-    options = DEFAULT_OPTIONS.copy()
-    options.update(get_app_kwarg_dict(appInstance))
+    options = DEFAULT_OPTIONS.copy() # 先复制一份默认响应头
+    options.update(get_app_kwarg_dict(appInstance)) # 用current_app中的config字典更新options
+    # 注意这里dicts是之前调用装饰器时传入的参数, 即如果装饰器也传入了额外参数，用该参数更新options
     if dicts:
         for d in dicts:
             options.update(d)
 
-    return serialize_options(options)
+    return serialize_options(options) # 返回parse好的options
 
 
 def get_app_kwarg_dict(appInstance=None):
@@ -305,12 +306,13 @@ def get_app_kwarg_dict(appInstance=None):
     app = (appInstance or current_app)
 
     # In order to support blueprints which do not have a config attribute
-    app_config = getattr(app, 'config', {})
+    app_config = getattr(app, 'config', {}) # config是current_app中的属性，是一个字典
 
     return {
         k.lower().replace('cors_', ''): app_config.get(k)
         for k in CONFIG_OPTIONS
         if app_config.get(k) is not None
+        # 对于每个在合法options里的k, 如果在app_config中也存在, 则经过小写化+去前缀后返回
     }
 
 
@@ -332,8 +334,8 @@ def flexible_str(obj):
 
 def serialize_option(options_dict, key, upper=False):
     if key in options_dict:
-        value = flexible_str(options_dict[key])
-        options_dict[key] = value.upper() if upper else value
+        value = flexible_str(options_dict[key]) # 将值变成一个用逗号连接的字符串
+        options_dict[key] = value.upper() if upper else value # 然后全部置为大写
 
 
 def ensure_iterable(inst):
@@ -354,9 +356,11 @@ def sanitize_regex_param(param):
 def serialize_options(opts):
     """
     A helper method to serialize and processes the options dictionary.
+    # 说白了就是做一些脏活儿
     """
     options = (opts or {}).copy()
 
+    # 判断传入options的合法性
     for key in opts.keys():
         if key not in DEFAULT_OPTIONS:
             LOG.warning("Unknown option passed to Flask-CORS: %s", key)
@@ -367,6 +371,7 @@ def serialize_options(opts):
 
     # This is expressly forbidden by the spec. Raise a value error so people
     # don't get burned in production.
+    # 一个关键(坑)点, 简单来说就是supports_credentials为true时origins不能为*，详见报错里给的链接
     if r'.*' in options['origins'] and options['supports_credentials'] and options['send_wildcard']:
         raise ValueError("Cannot use supports_credentials in conjunction with"
                          "an origin string of '*'. See: "
@@ -374,8 +379,8 @@ def serialize_options(opts):
 
 
 
-    serialize_option(options, 'expose_headers')
-    serialize_option(options, 'methods', upper=True)
+    serialize_option(options, 'expose_headers') # parse头部
+    serialize_option(options, 'methods', upper=True) # parse方法
 
     if isinstance(options.get('max_age'), timedelta):
         options['max_age'] = str(int(options['max_age'].total_seconds()))
